@@ -20,6 +20,10 @@ struct Args {
     /// The name of the S3-compatible storage.
     #[arg(long)]
     space_name: String,
+
+    /// Print progress about the backup (default = false).
+    #[arg(long, default_value_t = false)]
+    progress: bool,
 }
 
 fn main() {
@@ -28,7 +32,11 @@ fn main() {
         access_key,
         secret_key,
         space_name,
+        progress,
     } = Args::parse();
+    let time = jiff::Zoned::now()
+        .with_time_zone(jiff::tz::TimeZone::UTC)
+        .strftime("%Y-%m-%d_%H-%M-%S");
     let dest_file = tempfile::NamedTempFile::new().unwrap();
     let dest_compressed_file = tempfile::tempfile().unwrap();
 
@@ -48,13 +56,15 @@ fn main() {
         let source_filename =
             std::ffi::CString::new(source_path.to_string_lossy().to_string()).unwrap();
 
-        fn callback(_remaining_pages: i32, _total_pages: i32) {
-            // println!(
-            //     "Backup progress: {} of {} pages remaining",
-            //     remaining_pages, total_pages
-            // );
+        let callback = |remaining_pages: i32, total_pages: i32| {
+            if progress {
+                println!(
+                    "Backup progress: {} of {} pages remaining",
+                    remaining_pages, total_pages
+                );
+            }
             std::thread::sleep(std::time::Duration::from_millis(25));
-        }
+        };
 
         let mut source_db: *mut sqlite3 = std::ptr::null_mut();
         let rc = sqlite3_open(source_filename.as_ptr(), &mut source_db);
@@ -101,6 +111,7 @@ fn main() {
         .and_then(|object| {
             s3_client
                 .put_object()
+                .key(time.to_string())
                 .bucket(space_name)
                 .body(object)
                 .send()
@@ -112,7 +123,7 @@ fn main() {
         .unwrap();
     match rt.block_on(upload_fut) {
         Ok(_) => {
-            println!("Upload successful");
+            println!("Upload successful @ {}", time);
         }
         Err(err) => {
             println!("Upload failed: {}", err);
