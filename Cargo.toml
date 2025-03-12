@@ -1,0 +1,17 @@
+[package]
+name = "sqlite3-backup"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aws-sdk-s3 = "1.78.0"
+sqlite3-sys = { version = "0.17.0", default-features = false, features = [
+    "linkage",
+    "bundled",
+] }
+xz2 = { version = "0.1.7", features = ["static"] }
+tokio = { version = "1", features = ["rt"] }
+clap = { version = "4.5.32", features = ["derive"] }
+tempfile = "3.18.0"
+futures = { version = "0.3.31", default-features = false }
+anyhow = "1.0.97"
