@@ -36,7 +36,7 @@ fn main() {
     } = Args::parse();
     let time = jiff::Zoned::now()
         .with_time_zone(jiff::tz::TimeZone::UTC)
-        .strftime("%Y-%m-%d_%H-%M-%S");
+        .strftime("%Y-%m-%d_%H:%M:%S");
     let dest_file = tempfile::NamedTempFile::new().unwrap();
     let dest_compressed_file = tempfile::tempfile().unwrap();
 
@@ -116,7 +116,7 @@ fn main() {
         .and_then(|object| {
             s3_client
                 .put_object()
-                .key(time.to_string())
+                .key(format!("{}.db.xz", time))
                 .bucket(space_name)
                 .body(object)
                 .send()
@@ -174,9 +174,9 @@ where
                 source_db,
                 source_name.as_ptr(),
             );
+            sqlite3_backup_step(backup, 0);
             let page_count = sqlite3_backup_pagecount(backup);
             let step = page_count / 100;
-            println!("Total pages: {}. Stepping by {} pages.", page_count, step);
             if !backup.is_null() {
                 loop {
                     rc = sqlite3_backup_step(backup, step);
