@@ -176,6 +176,7 @@ where
             );
             let page_count = sqlite3_backup_pagecount(backup);
             let step = page_count / 100;
+            println!("Total pages: {}. Stepping by {} pages.", page_count, step);
             if !backup.is_null() {
                 loop {
                     rc = sqlite3_backup_step(backup, step);
