@@ -92,7 +92,7 @@ fn main() {
             xz2::stream::Stream::new_easy_encoder(9, xz2::stream::Check::Crc64).unwrap(),
         );
 
-        const CHUNK_SIZE: usize = 4096; // bytes; one memory page
+        const CHUNK_SIZE: usize = 4096 * 10; // bytes; 10 memory pages
         let mut buffer = vec![0; CHUNK_SIZE];
 
         loop {
