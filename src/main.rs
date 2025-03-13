@@ -124,6 +124,7 @@ fn main() {
         });
 
     let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
         .build()
         .unwrap();
     match rt.block_on(upload_fut) {
