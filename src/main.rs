@@ -56,19 +56,24 @@ fn main() {
         let source_filename =
             std::ffi::CString::new(source_path.to_string_lossy().to_string()).unwrap();
 
-        let callback = |remaining_pages: i32, total_pages: i32| {
-            if progress {
-                println!(
-                    "Backup progress: {} of {} pages remaining",
-                    remaining_pages, total_pages
-                );
-            }
-            std::thread::sleep(std::time::Duration::from_millis(25));
-        };
-
         let mut source_db: *mut sqlite3 = std::ptr::null_mut();
         let rc = sqlite3_open(source_filename.as_ptr(), &mut source_db);
         assert_eq!(rc, SQLITE_OK);
+
+        let mut previous = std::time::Instant::now();
+        let callback = |remaining_pages: i32, total_pages: i32| {
+            if progress {
+                let now = std::time::Instant::now();
+                println!(
+                    "Backup progress: {} of {} pages remaining in {}ms",
+                    remaining_pages,
+                    total_pages,
+                    now.duration_since(previous).as_millis()
+                );
+                previous = now;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        };
 
         let dest_filename = dest_file.path().to_str().unwrap();
         let rc = backup_db(source_db, dest_filename, callback);
@@ -141,10 +146,10 @@ fn main() {
 fn backup_db<F>(
     source_db: *mut sqlite3_sys::sqlite3,
     dest_filename: &str,
-    progress_callback: F,
+    mut progress_callback: F,
 ) -> i32
 where
-    F: Fn(i32, i32),
+    F: FnMut(i32, i32),
 {
     use sqlite3_sys::*;
     use std::ffi::CString;
@@ -169,13 +174,12 @@ where
                 source_db,
                 source_name.as_ptr(),
             );
+            let page_count = sqlite3_backup_pagecount(backup);
+            let step = page_count / 100;
             if !backup.is_null() {
                 loop {
-                    rc = sqlite3_backup_step(backup, 5);
-                    progress_callback(
-                        sqlite3_backup_remaining(backup),
-                        sqlite3_backup_pagecount(backup),
-                    );
+                    rc = sqlite3_backup_step(backup, step);
+                    progress_callback(sqlite3_backup_remaining(backup), page_count);
 
                     if rc != SQLITE_OK && rc != SQLITE_BUSY && rc != SQLITE_LOCKED {
                         break;
