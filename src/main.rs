@@ -84,28 +84,16 @@ fn main() {
     }
 
     let dest_compressed_file = {
-        use std::io::{Read, Write};
-
         let mut reader = std::io::BufReader::new(dest_file);
-        let mut encoder = xz2::write::XzEncoder::new_stream(
+        let mut encoder = liblzma::write::XzEncoder::new_parallel(
             std::io::BufWriter::new(dest_compressed_file),
-            xz2::stream::Stream::new_easy_encoder(9, xz2::stream::Check::Crc64).unwrap(),
+            9,
         );
 
-        const CHUNK_SIZE: usize = 4096 * 10; // bytes; 10 memory pages
-        let mut buffer = vec![0; CHUNK_SIZE];
-
-        loop {
-            let bytes_read = reader.read(&mut buffer).unwrap();
-            if bytes_read == 0 {
-                break; // EOF
-            }
-
-            encoder.write_all(&buffer).unwrap();
-        }
+        std::io::copy(&mut reader, &mut encoder).unwrap();
 
         let mut writer = encoder.finish().unwrap();
-        writer.flush().unwrap();
+        std::io::Write::flush(&mut writer).unwrap();
         writer.into_inner().unwrap()
     };
 
