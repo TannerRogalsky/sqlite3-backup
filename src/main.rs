@@ -9,7 +9,7 @@ struct Args {
     #[arg(short, long)]
     source_path: std::path::PathBuf,
 
-    ///The folder to store the backup in. Should end with a slash.
+    ///The bucket prefix to store the backup in.
     #[arg(short, long)]
     destination_path: String,
 
@@ -110,7 +110,7 @@ fn main() {
         .and_then(|object| {
             s3_client
                 .put_object()
-                .key(format!("{}/{}.db.xz", destination_path, time))
+                .key(format!("{}{}.db.xz", destination_path, time))
                 .bucket(space_name)
                 .body(object)
                 .send()
