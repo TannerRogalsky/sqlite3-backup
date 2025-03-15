@@ -9,6 +9,10 @@ struct Args {
     #[arg(short, long)]
     source_path: std::path::PathBuf,
 
+    ///The folder to store the backup in. Should end with a slash.
+    #[arg(short, long)]
+    destination_path: String,
+
     /// The access key for the S3-compatible storage.
     #[arg(long)]
     access_key: String,
@@ -29,6 +33,7 @@ struct Args {
 fn main() {
     let Args {
         source_path,
+        destination_path,
         access_key,
         secret_key,
         space_name,
@@ -38,15 +43,16 @@ fn main() {
         .with_time_zone(jiff::tz::TimeZone::UTC)
         .strftime("%Y-%m-%d_%H:%M:%S");
     let dest_file = tempfile::NamedTempFile::new().unwrap();
-    let dest_compressed_file = tempfile::tempfile().unwrap();
+    let dest_compressed_file = tempfile::NamedTempFile::new().unwrap();
 
     let s3_client = aws_sdk_s3::Client::from_conf(
         aws_sdk_s3::config::Builder::new()
-            .region(aws_sdk_s3::config::Region::new("ny3".to_string()))
+            .region(aws_sdk_s3::config::Region::new("us-east-1".to_string()))
             .endpoint_url("https://nyc3.digitaloceanspaces.com") // Set the endpoint for DigitalOcean Spaces
             .credentials_provider(aws_sdk_s3::config::Credentials::new(
                 access_key, secret_key, None, None, "do",
             ))
+            .force_path_style(false)
             .build(),
     );
 
@@ -98,13 +104,13 @@ fn main() {
     };
 
     let upload_fut = aws_sdk_s3::primitives::ByteStream::read_from()
-        .file(tokio::fs::File::from_std(dest_compressed_file))
+        .path(dest_compressed_file.path())
         .build()
         .err_into::<anyhow::Error>()
         .and_then(|object| {
             s3_client
                 .put_object()
-                .key(format!("{}.db.xz", time))
+                .key(format!("{}/{}.db.xz", destination_path, time))
                 .bucket(space_name)
                 .body(object)
                 .send()
@@ -123,6 +129,7 @@ fn main() {
             println!("Upload failed: {}", err);
         }
     }
+    drop(dest_compressed_file)
 }
 
 /// Perform an online backup of a database to a file.
